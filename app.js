@@ -1,5 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
-   COOLISM — Complete App Logic (Single Theme, No Loyalty)
+   COOLISM — Complete App Logic
+   Firebase Auth + Firestore + Products + Categories + Banner
+   No loyalty points. Grey/white theme.
    ═══════════════════════════════════════════════════════════ */
 
 const firebaseConfig = {
@@ -14,11 +16,13 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+/* ═══════ STATE ═══════ */
 let PRODUCTS = [];
 let CATEGORIES = {};
 let cart = [];
 let allUsers = [];
 let allOrders = [];
+let allCategories = [];
 let currentDetail = { product:null, size:null, color:null, qty:1, images:[], index:0 };
 let currentFilter = 'all';
 let currentSort = 'featured';
@@ -43,7 +47,6 @@ const FALLBACK_CATS = {
 };
 
 const FALLBACK_PRODUCTS = [
-  // MEN
   { id:'m1', name:'Classic White Tee', gender:'men', cat:'shirts', price:2490, oldPrice:3200, tag:'New',
     images:['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=700&q=80'],
     desc:'A relaxed-fit tee cut from heavyweight 320 GSM cotton.',
@@ -100,8 +103,6 @@ const FALLBACK_PRODUCTS = [
     colors:[{name:'Navy',hex:'#131F3A'},{name:'Grey',hex:'#8A8A8A'}],
     fabric:'Cotton-poly blend', care:'Machine wash cold', sku:'CLM-M-HD-002',
     inStock:true, stock:35, lowStock:5 },
-
-  // WOMEN
   { id:'w1', name:'Silk Button Blouse', gender:'women', cat:'shirts', price:5490, oldPrice:6490, tag:'New',
     images:['https://images.unsplash.com/photo-1564257577032-6b3d3cfa1ce4?w=700&q=80'],
     desc:'Fluid silk blouse with a relaxed drape and pearl buttons.',
@@ -172,7 +173,8 @@ let toastTimer;
 function toast(msg) {
   const el = document.getElementById('toast');
   if (!el) return;
-  document.getElementById('toastMsg').textContent = msg;
+  const m = document.getElementById('toastMsg');
+  if (m) m.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
@@ -258,29 +260,22 @@ async function saveUserToFirestore(user, extra = {}) {
 async function loadCatalog() {
   try {
     const snap = await db.collection('categories').get();
-    if (!snap.empty) {
-      const loaded = {};
-      snap.forEach(doc => {
-        const d = doc.data();
-        if (d.hidden) return; // skip hidden categories
-        loaded[doc.id] = {
-          label: d.label || doc.id,
-          gender: d.gender || 'unisex',
-          desc: d.desc || d.sub || '',
-          img: d.img || ''
-        };
-      });
-      CATEGORIES = { ...FALLBACK_CATS, ...loaded };
-
-      // Also remove hidden fallbacks
-      const hiddenSnap = await db.collection('categories').where('hidden','==',true).get();
-      hiddenSnap.forEach(doc => { delete CATEGORIES[doc.id]; });
-    } else {
-      CATEGORIES = { ...FALLBACK_CATS };
-    }
+    const loaded = {};
+    const hidden = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (d.hidden) { hidden.push(doc.id); return; }
+      loaded[doc.id] = {
+        label: d.label || doc.id,
+        gender: d.gender || 'unisex',
+        desc: d.desc || d.sub || '',
+        img: d.img || ''
+      };
+    });
+    CATEGORIES = { ...FALLBACK_CATS, ...loaded };
+    hidden.forEach(id => { delete CATEGORIES[id]; });
   } catch (e) { CATEGORIES = { ...FALLBACK_CATS }; }
-  // ... rest of product loading unchanged
-}
+
   try {
     const snap = await db.collection('products').get();
     if (!snap.empty) {
@@ -310,6 +305,48 @@ async function loadCatalog() {
 
 const getCat = k => CATEGORIES[k] || FALLBACK_CATS[k] || { label:k, gender:'unisex', desc:'', img:'' };
 
+/* ═══════ HERO BANNER ═══════ */
+async function loadBanner() {
+  const banner = document.getElementById('heroBanner');
+  if (!banner) return;
+  const defaults = {
+    image: 'images/banner.jpg',
+    eyebrow: 'The Coolism Drop',
+    title: 'Comfort meets <em>Coolism</em>',
+    sub: 'Premium pieces crafted for people who prefer quiet confidence.',
+    cta1Text: 'Shop Man',  cta1Link: 'shop.html?gender=men',
+    cta2Text: 'Shop Women', cta2Link: 'shop.html?gender=women',
+    active: true
+  };
+  let d = { ...defaults };
+  try {
+    const snap = await db.collection('settings').doc('banner').get();
+    if (snap.exists) d = { ...defaults, ...snap.data() };
+  } catch (e) {}
+  if (d.active === false) { banner.hidden = true; return; }
+  banner.hidden = false;
+  const bg = document.getElementById('heroBg');
+  const imgUrl = d.image && d.image.startsWith('http')
+    ? d.image
+    : (window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + (d.image || 'images/banner.jpg'));
+  if (bg) {
+    bg.style.backgroundImage = `url('${imgUrl}')`;
+    const test = new Image();
+    test.onerror = () => banner.classList.add('no-image');
+    test.src = imgUrl;
+  }
+  const setText = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.innerHTML = val; };
+  setText('heroEyebrow', d.eyebrow);
+  setText('heroTitle', d.title);
+  setText('heroSub', d.sub);
+  const ctas = document.getElementById('heroCtas');
+  if (ctas) {
+    const c1 = d.cta1Text ? `<a href="${d.cta1Link||'#'}" class="btn btn-silver">${d.cta1Text}</a>` : '';
+    const c2 = d.cta2Text ? `<a href="${d.cta2Link||'#'}" class="btn btn-line">${d.cta2Text}</a>` : '';
+    ctas.innerHTML = c1 + c2;
+  }
+}
+
 /* ═══════ PRODUCT VISUALS ═══════ */
 function productVisual(p, cls = 'card-placeholder') {
   const img = (p.images && p.images[0]) || p.img;
@@ -328,7 +365,7 @@ function cartVisual(p) {
   return `<div class="mini-letter" style="background:#333">${p.name.charAt(0)}</div>`;
 }
 
-/* ═══════ RENDER CATEGORY TILES (homepage) ═══════ */
+/* ═══════ RENDER CATEGORY TILES ═══════ */
 function renderCategoryTiles() {
   const grid = document.getElementById('catGrid');
   if (!grid) return;
@@ -422,7 +459,6 @@ function renderShopPage() {
     if (eyebrow) eyebrow.textContent = 'Browse All';
   }
 
-  // Filter chips — show categories for current gender
   const filters = document.getElementById('filters');
   if (filters) {
     const catKeys = Object.keys(CATEGORIES).filter(k => {
@@ -434,7 +470,6 @@ function renderShopPage() {
       catKeys.map(k => `<button class="chip ${shopCat===k?'active':''}" data-filter="${k}">${CATEGORIES[k].label}</button>`).join('');
   }
 
-  // Filter products
   let list = PRODUCTS;
   if (shopGender) list = list.filter(p => p.gender === shopGender);
   if (shopCat) list = list.filter(p => p.cat === shopCat);
@@ -454,7 +489,6 @@ function renderShopPage() {
     }
   }
 
-  // Filter chip clicks
   if (filters) filters.addEventListener('click', e => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
@@ -720,7 +754,7 @@ async function placeOrder(user, formData) {
   }
 }
 
-/* ═══════ PROFILE PAGE ═══════ */
+/* ═══════ PROFILE ═══════ */
 async function loadProfile(user) {
   const noAuth = document.getElementById('noAuth');
   if (!user) { if (noAuth) noAuth.hidden = false; return; }
@@ -844,8 +878,8 @@ function renderTrackResult(order) {
 
   c.innerHTML = `<div class="track-result">
     <h3 style="margin-bottom:8px">Order ${order.orderId}</h3>
-    <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:22px">Placed on ${date}</p>
-    ${cancelled ? `<div style="text-align:center;padding:24px;background:rgba(224,106,106,.15);border-radius:14px;color:#E06A6A;font-weight:700">This order was cancelled</div>` :
+    <p style="color:var(--ink-muted);font-size:.9rem;margin-bottom:22px">Placed on ${date}</p>
+    ${cancelled ? `<div style="text-align:center;padding:24px;background:rgba(194,74,74,.15);border-radius:14px;color:#C24A4A;font-weight:700">This order was cancelled</div>` :
       `<div class="track-steps">
         ${steps.map((s,i) => {
           const cls = i <= idx ? (i === idx ? 'current' : 'done') : '';
@@ -960,7 +994,6 @@ function renderProductsTable(list) {
 }
 
 /* ═══════ ADMIN — CATEGORIES ═══════ */
-let allCategories = [];
 async function loadCategories() {
   const tbody = document.getElementById('categoriesTbody');
   if (!tbody) return;
@@ -969,22 +1002,17 @@ async function loadCategories() {
   let firestoreCats = {};
   try {
     const snap = await db.collection('categories').get();
-    snap.forEach(doc => { firestoreCats[doc.id] = { id: doc.id, ...doc.data() }; });
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (d.hidden) return;
+      firestoreCats[doc.id] = { id: doc.id, ...d };
+    });
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Error: ${e.message}</td></tr>`;
     return;
   }
 
-  // Merge fallback categories + Firestore categories
-  const fallback = {
-    shirts:  { label:'Shirts',  gender:'unisex', desc:'Heavyweight tees & crisp cotton', img:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80' },
-    pants:   { label:'Pants',   gender:'unisex', desc:'Tailored wide-leg & relaxed fits', img:'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800&q=80' },
-    jackets: { label:'Jackets', gender:'unisex', desc:'Leather, bombers & denim',         img:'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80' },
-    hoodies: { label:'Hoodies', gender:'unisex', desc:'Oversized & fleece-lined comfort', img:'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800&q=80' },
-    purses:  { label:'Purses',  gender:'women',  desc:'Leather & mini totes',             img:'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80' }
-  };
-
-  const merged = { ...fallback, ...firestoreCats };
+  const merged = { ...FALLBACK_CATS, ...firestoreCats };
   allCategories = Object.keys(merged).map(id => ({ id, ...merged[id] }));
   renderCategoriesTable(allCategories);
   updateAdminStats();
@@ -1024,20 +1052,17 @@ function renderCategoriesTable(list) {
       const c = allCategories.find(x => x.id === b.dataset.deleteCat);
       if (!confirm(`Delete category "${c?.label || 'this'}"? Products in this category will lose their label.`)) return;
       try {
-        // If it exists in Firestore, delete it
         const ref = db.collection('categories').doc(b.dataset.deleteCat);
         const snap = await ref.get();
-        if (snap.exists) await ref.delete();
-
-        // If it's a fallback-only category, mark it as hidden so it disappears from storefront
-        const fallbackIds = ['shirts','pants','jackets','hoodies','purses'];
-        if (fallbackIds.includes(b.dataset.deleteCat) && !snap.exists) {
-          await db.collection('categories').doc(b.dataset.deleteCat).set({
+        if (snap.exists) {
+          await ref.delete();
+        } else {
+          // Fallback-only category → mark hidden
+          await ref.set({
             hidden: true,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         }
-
         toast('Category deleted');
         await loadCatalog();
         loadCategories();
@@ -1045,37 +1070,6 @@ function renderCategoriesTable(list) {
         console.error(e);
         toast('Could not delete: ' + (e.code || e.message));
       }
-    }));
-}
-  tbody.innerHTML = list.map((c, i) => {
-    const thumb = c.img
-      ? `<img src="${c.img}" class="product-thumb" alt="${c.label}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="product-thumb-ph" style="display:none">${(c.label||'?').charAt(0)}</div>`
-      : `<div class="product-thumb-ph">${(c.label||'?').charAt(0)}</div>`;
-    const count = PRODUCTS.filter(p => p.cat === c.id).length;
-    return `<tr>
-      <td>${i+1}</td>
-      <td>${thumb}</td>
-      <td><b>${c.label||c.id}</b></td>
-      <td>${c.gender||'unisex'}</td>
-      <td style="max-width:280px">${c.desc||c.sub||'—'}</td>
-      <td><b>${count}</b></td>
-      <td>
-        <button class="action-btn edit" data-edit-cat="${c.id}">Edit</button>
-        <button class="action-btn delete" data-delete-cat="${c.id}">Delete</button>
-      </td>
-    </tr>`;
-  }).join('');
-  tbody.querySelectorAll('[data-edit-cat]').forEach(b =>
-    b.addEventListener('click', () => openCategoryForm(b.dataset.editCat)));
-  tbody.querySelectorAll('[data-delete-cat]').forEach(b =>
-    b.addEventListener('click', async () => {
-      const c = allCategories.find(x => x.id === b.dataset.deleteCat);
-      if (!confirm(`Delete category "${c?.label || 'this'}"?`)) return;
-      try {
-        await db.collection('categories').doc(b.dataset.deleteCat).delete();
-        toast('Category deleted');
-        loadCategories();
-      } catch (e) { toast('Could not delete'); }
     }));
 }
 
@@ -1086,7 +1080,6 @@ function openCategoryForm(id) {
   form.reset();
   document.getElementById('categoryModalTitle').textContent = id ? 'Edit Category' : 'Add New Category';
 
-  // Reset preview
   const prev = document.getElementById('catPreview');
   if (prev) {
     prev.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>`;
@@ -1100,9 +1093,9 @@ function openCategoryForm(id) {
       document.getElementById('c-gender').value = c.gender || 'unisex';
       document.getElementById('c-img').value = c.img || '';
       document.getElementById('c-desc').value = c.desc || c.sub || '';
-      if (c.img) {
-        const pv = document.getElementById('catPreview');
-        if (pv) { pv.innerHTML = `<img src="${c.img}" alt="Preview">`; pv.classList.add('has-image'); }
+      if (c.img && prev) {
+        prev.innerHTML = `<img src="${c.img}" alt="Preview">`;
+        prev.classList.add('has-image');
       }
     }
     form.dataset.editId = id;
@@ -1128,17 +1121,16 @@ async function saveCategory(e) {
 
   const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'images/';
   const img = imgRaw.startsWith('http') ? imgRaw : baseUrl + imgRaw;
-
   const slug = editId || label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
   try {
     await db.collection('categories').doc(slug).set({
       label, gender, img, desc,
+      hidden: false,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
     toast(editId ? 'Category updated' : 'Category created');
     document.getElementById('categoryModal').classList.remove('show');
-    // Refresh both categories and the CATEGORIES global map
     await loadCatalog();
     loadCategories();
   } catch (e) {
@@ -1147,7 +1139,7 @@ async function saveCategory(e) {
   }
 }
 
-/* ═══════ PRODUCT FORM ═══════ */
+/* ═══════ ADMIN — PRODUCT FORM ═══════ */
 function fillCategoryDropdown() {
   const sel = document.getElementById('p-category');
   if (!sel) return;
@@ -1428,7 +1420,7 @@ function showAdminUser(uid) {
   const uo = allOrders.filter(o => o.uid === uid);
   const oh = uo.length
     ? uo.map(o => `<div class="order-item"><div><div class="nm">${o.orderId} · ${money(o.total)}</div><div class="vr">${o.itemCount||0} items · ${o.city||'—'}</div><div class="qt">${o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString() : '—'}</div></div><div><span class="${o.status==='delivered'?'badge-yes':'badge-info'}">${o.status||'pending'}</span></div></div>`).join('')
-    : `<div style="text-align:center;padding:30px;color:var(--text-muted);font-style:italic;font-size:.9rem">No orders yet</div>`;
+    : `<div style="text-align:center;padding:30px;color:var(--ink-muted);font-style:italic;font-size:.9rem">No orders yet</div>`;
   document.getElementById('auBody').innerHTML = `
     <div class="order-detail-block"><h4>User Information</h4>
       <div class="row"><b>Name</b><span>${n}</span></div>
@@ -1455,7 +1447,7 @@ function updateAdminStats() {
   if (rt) rt.textContent = money(allOrders.reduce((s,o) => s + (o.total||0), 0));
 }
 
-/* ═══════ ANALYTICS ═══════ */
+/* ═══════ ADMIN — ANALYTICS ═══════ */
 function renderAnalytics() {
   const grid = document.getElementById('analyticsGrid');
   if (!grid) return;
@@ -1491,20 +1483,71 @@ function renderAnalytics() {
     <div class="analytics-card">
       <h3>Key Metrics</h3>
       <p class="a-sub">Overall performance</p>
-      <div class="stat-box" style="width:100%;margin-bottom:12px;border-color:var(--line)"><b>${allOrders.length}</b><span>Total Orders</span></div>
-      <div class="stat-box" style="width:100%;margin-bottom:12px;border-color:var(--line)"><b>${money(avgOrder)}</b><span>Avg Order Value</span></div>
-      <div class="stat-box" style="width:100%;border-color:var(--line)"><b>${allUsers.length}</b><span>Total Users</span></div>
+      <div class="stat-box" style="width:100%;margin-bottom:12px"><b>${allOrders.length}</b><span>Total Orders</span></div>
+      <div class="stat-box" style="width:100%;margin-bottom:12px"><b>${money(avgOrder)}</b><span>Avg Order Value</span></div>
+      <div class="stat-box" style="width:100%"><b>${allUsers.length}</b><span>Total Users</span></div>
     </div>
     <div class="analytics-card">
       <h3>Top Products</h3>
       <p class="a-sub">By revenue</p>
-      <div class="top-list">${top.length ? top.map((t,i) => `<div class="top-item"><div class="top-rank">${i+1}</div><div><b>${t.name}</b><span>${t.qty} sold</span></div><div class="top-rev">${money(t.rev)}</div></div>`).join('') : '<div style="text-align:center;color:var(--text-soft);font-style:italic;padding:20px">No sales yet</div>'}</div>
+      <div class="top-list">${top.length ? top.map((t,i) => `<div class="top-item"><div class="top-rank">${i+1}</div><div><b>${t.name}</b><span>${t.qty} sold</span></div><div class="top-rev">${money(t.rev)}</div></div>`).join('') : '<div style="text-align:center;color:var(--ink-soft);font-style:italic;padding:20px">No sales yet</div>'}</div>
     </div>
     <div class="analytics-card">
       <h3>Top Cities</h3>
       <p class="a-sub">By order count</p>
-      <div class="top-list">${topCities.length ? topCities.map((c,i) => `<div class="top-item"><div class="top-rank">${i+1}</div><div><b>${c.city}</b><span>orders</span></div><div class="top-rev">${c.count}</div></div>`).join('') : '<div style="text-align:center;color:var(--text-soft);font-style:italic;padding:20px">No data yet</div>'}</div>
+      <div class="top-list">${topCities.length ? topCities.map((c,i) => `<div class="top-item"><div class="top-rank">${i+1}</div><div><b>${c.city}</b><span>orders</span></div><div class="top-rev">${c.count}</div></div>`).join('') : '<div style="text-align:center;color:var(--ink-soft);font-style:italic;padding:20px">No data yet</div>'}</div>
     </div>`;
+}
+
+/* ═══════ ADMIN — BANNER ═══════ */
+async function loadBannerAdmin() {
+  const form = document.getElementById('bannerForm');
+  if (!form) return;
+  try {
+    const snap = await db.collection('settings').doc('banner').get();
+    const d = snap.exists ? snap.data() : {
+      image:'images/banner.jpg', eyebrow:'The Coolism Drop',
+      title:'Comfort meets <em>Coolism</em>',
+      sub:'Premium pieces crafted for people who prefer quiet confidence.',
+      cta1Text:'Shop Man', cta1Link:'shop.html?gender=men',
+      cta2Text:'Shop Women', cta2Link:'shop.html?gender=women', active:true
+    };
+    const v = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    v('b-image', d.image); v('b-eyebrow', d.eyebrow); v('b-title', d.title);
+    v('b-sub', d.sub); v('b-c1t', d.cta1Text); v('b-c1l', d.cta1Link);
+    v('b-c2t', d.cta2Text); v('b-c2l', d.cta2Link);
+    const a = document.getElementById('b-active'); if (a) a.checked = d.active !== false;
+    updateBannerPreview();
+  } catch (e) { console.error(e); }
+}
+
+function updateBannerPreview() {
+  const inp = document.getElementById('b-image');
+  const prev = document.getElementById('bannerPreview');
+  if (!inp || !prev) return;
+  const v = inp.value.trim();
+  if (!v) { prev.innerHTML = ''; return; }
+  const url = v.startsWith('http') ? v : (window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + v);
+  prev.innerHTML = `<img src="${url}" alt="Preview" style="width:100%;height:100%;object-fit:cover;border-radius:14px">`;
+}
+
+async function saveBanner(e) {
+  e.preventDefault();
+  const get = id => document.getElementById(id)?.value.trim() || '';
+  const data = {
+    image: get('b-image'),
+    eyebrow: get('b-eyebrow'),
+    title: get('b-title'),
+    sub: get('b-sub'),
+    cta1Text: get('b-c1t'), cta1Link: get('b-c1l'),
+    cta2Text: get('b-c2t'), cta2Link: get('b-c2l'),
+    active: document.getElementById('b-active')?.checked !== false,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try {
+    await db.collection('settings').doc('banner').set(data, { merge: true });
+    toast('Banner saved');
+  } catch (e) { toast('Could not save: ' + (e.code || e.message)); }
 }
 
 /* ═══════ CSV EXPORT ═══════ */
@@ -1521,6 +1564,14 @@ function exportCSV(filename, headers, rows) {
   toast('Exported successfully');
 }
 
+/* ═══════ HOME FILTER CHIPS ═══════ */
+function renderFiltersHome() {
+  const el = document.getElementById('filters');
+  if (!el) return;
+  el.innerHTML = `<button class="chip active" data-filter="all">All</button>` +
+    Object.keys(CATEGORIES).map(k => `<button class="chip" data-filter="${k}">${CATEGORIES[k].label}</button>`).join('');
+}
+
 /* ═══════ BOOT ═══════ */
 const page = document.body.dataset.page;
 
@@ -1530,9 +1581,11 @@ const page = document.body.dataset.page;
   const user = await authReady;
 
   if (page === 'home') {
+    await loadBanner();
     renderCategoryTiles();
     renderFiltersHome();
     renderProducts('all', 'featured');
+
     const filters = document.getElementById('filters');
     if (filters) filters.addEventListener('click', e => {
       const chip = e.target.closest('.chip');
@@ -1542,6 +1595,7 @@ const page = document.body.dataset.page;
       currentFilter = chip.dataset.filter;
       renderProducts(currentFilter, currentSort);
     });
+
     const sortSel = document.getElementById('sortSelect');
     if (sortSel) sortSel.addEventListener('change', () => {
       currentSort = sortSel.value;
@@ -1588,17 +1642,11 @@ const page = document.body.dataset.page;
     await loadCategories();
     await loadOrders();
     await loadUsers();
+    await loadBannerAdmin();
   }
 })();
 
-function renderFiltersHome() {
-  const el = document.getElementById('filters');
-  if (!el) return;
-  el.innerHTML = `<button class="chip active" data-filter="all">All</button>` +
-    Object.keys(CATEGORIES).map(k => `<button class="chip" data-filter="${k}">${CATEGORIES[k].label}</button>`).join('');
-}
-
-/* ═══════ GLOBAL EVENTS ═══════ */
+/* ═══════ GLOBAL CLICK EVENTS ═══════ */
 document.addEventListener('click', e => {
   if (e.target.closest('#cartBtn')) { openCart(); return; }
   if (e.target.closest('#cartClose')) { closeCart(); return; }
@@ -1756,7 +1804,7 @@ document.addEventListener('click', e => {
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
     adminTab.classList.add('active');
     const w = adminTab.dataset.tab;
-    ['products','categories','orders','users','analytics'].forEach(p => {
+    ['products','categories','orders','users','analytics','banner'].forEach(p => {
       const el = document.getElementById('panel-' + p);
       if (el) el.hidden = w !== p;
     });
@@ -1788,7 +1836,6 @@ document.addEventListener('input', e => {
     }
   }
 
-  // Category image preview
   if (e.target.id === 'c-img') {
     const val = e.target.value.trim();
     const prev = document.getElementById('catPreview');
@@ -1803,6 +1850,8 @@ document.addEventListener('input', e => {
       prev.classList.remove('has-image');
     }
   }
+
+  if (e.target.id === 'b-image') updateBannerPreview();
 
   if (['co-city','co-district','co-province'].includes(e.target.id)) updateCheckoutSummary();
 
@@ -1895,7 +1944,7 @@ function switchTab(tab) {
   const sf = document.getElementById('signupForm'); if (sf) sf.hidden = tab !== 'signup';
 }
 
-/* ═══════ FORM HANDLERS ═══════ */
+/* ═══════ AUTH FORMS ═══════ */
 const loginForm = document.getElementById('loginForm');
 if (loginForm) loginForm.addEventListener('submit', async e => {
   e.preventDefault();
@@ -2063,11 +2112,13 @@ if (editForm) editForm.addEventListener('submit', async e => {
   } catch (err) { toast('Could not save'); }
 });
 
-/* ═══════ PRODUCT/CATEGORY FORM SUBMIT ═══════ */
+/* ═══════ FORM SUBMITS ═══════ */
 const productForm = document.getElementById('productForm');
 if (productForm) productForm.addEventListener('submit', saveProduct);
 const categoryForm = document.getElementById('categoryForm');
 if (categoryForm) categoryForm.addEventListener('submit', saveCategory);
+const bannerForm = document.getElementById('bannerForm');
+if (bannerForm) bannerForm.addEventListener('submit', saveBanner);
 
 /* ═══════ ADMIN REFRESH BUTTONS ═══════ */
 if (document.getElementById('refreshProducts')) document.getElementById('refreshProducts').addEventListener('click', loadProducts);
