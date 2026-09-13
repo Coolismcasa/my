@@ -959,14 +959,29 @@ async function loadCategories() {
   const tbody = document.getElementById('categoriesTbody');
   if (!tbody) return;
   tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Loading categories…</td></tr>`;
+
+  let firestoreCats = {};
   try {
     const snap = await db.collection('categories').get();
-    allCategories = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    renderCategoriesTable(allCategories);
-    updateAdminStats();
+    snap.forEach(doc => { firestoreCats[doc.id] = { id: doc.id, ...doc.data() }; });
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Error: ${e.message}</td></tr>`;
+    return;
   }
+
+  // Merge fallback categories + Firestore categories
+  const fallback = {
+    shirts:  { label:'Shirts',  gender:'unisex', desc:'Heavyweight tees & crisp cotton', img:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80' },
+    pants:   { label:'Pants',   gender:'unisex', desc:'Tailored wide-leg & relaxed fits', img:'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800&q=80' },
+    jackets: { label:'Jackets', gender:'unisex', desc:'Leather, bombers & denim',         img:'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80' },
+    hoodies: { label:'Hoodies', gender:'unisex', desc:'Oversized & fleece-lined comfort', img:'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800&q=80' },
+    purses:  { label:'Purses',  gender:'women',  desc:'Leather & mini totes',             img:'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80' }
+  };
+
+  const merged = { ...fallback, ...firestoreCats };
+  allCategories = Object.keys(merged).map(id => ({ id, ...merged[id] }));
+  renderCategoriesTable(allCategories);
+  updateAdminStats();
 }
 
 function renderCategoriesTable(list) {
