@@ -1638,9 +1638,37 @@ const page = document.body.dataset.page;
 
   if (page === 'profile') loadProfile(user);
 
-  if (page === 'admin') {
-  // TEMPORARY: no email check — any logged-in user can access admin
-  // REMEMBER TO ADD PROPER CHECK LATER
+ if (page === 'admin') {
+  const adminList = (document.body.dataset.admin || '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+  if (!user) {
+    const msg = document.getElementById('accessMsg');
+    if (msg) msg.hidden = false;
+    setTimeout(() => {
+      alert('Access denied. Please sign in with your admin account.');
+      window.location.href = 'index.html';
+    }, 400);
+    return;
+  }
+
+  const email = (user.email || '').toLowerCase();
+  const isVerified = user.emailVerified;
+  const provider = user.providerData[0]?.providerId || '';
+
+  // Must be in admin list AND email verified (Google accounts are auto-verified)
+  if (!adminList.includes(email)) {
+    alert('Access denied. This dashboard is for admins only.');
+    window.location.href = 'index.html';
+    return;
+  }
+
+  if (provider === 'password' && !isVerified) {
+    alert('Please verify your email address before accessing the dashboard.');
+    window.location.href = 'index.html';
+    return;
+  }
+
   await loadProducts();
   await loadCategories();
   await loadOrders();
