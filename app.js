@@ -1009,6 +1009,56 @@ function renderCategoriesTable(list) {
       </td>
     </tr>`;
   }).join('');
+
+  tbody.querySelectorAll('[data-edit-cat]').forEach(b =>
+    b.addEventListener('click', () => openCategoryForm(b.dataset.editCat)));
+
+  tbody.querySelectorAll('[data-delete-cat]').forEach(b =>
+    b.addEventListener('click', async () => {
+      const c = allCategories.find(x => x.id === b.dataset.deleteCat);
+      if (!confirm(`Delete category "${c?.label || 'this'}"? Products in this category will lose their label.`)) return;
+      try {
+        // If it exists in Firestore, delete it
+        const ref = db.collection('categories').doc(b.dataset.deleteCat);
+        const snap = await ref.get();
+        if (snap.exists) await ref.delete();
+
+        // If it's a fallback-only category, mark it as hidden so it disappears from storefront
+        const fallbackIds = ['shirts','pants','jackets','hoodies','purses'];
+        if (fallbackIds.includes(b.dataset.deleteCat) && !snap.exists) {
+          await db.collection('categories').doc(b.dataset.deleteCat).set({
+            hidden: true,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+
+        toast('Category deleted');
+        await loadCatalog();
+        loadCategories();
+      } catch (e) {
+        console.error(e);
+        toast('Could not delete: ' + (e.code || e.message));
+      }
+    }));
+}
+  tbody.innerHTML = list.map((c, i) => {
+    const thumb = c.img
+      ? `<img src="${c.img}" class="product-thumb" alt="${c.label}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="product-thumb-ph" style="display:none">${(c.label||'?').charAt(0)}</div>`
+      : `<div class="product-thumb-ph">${(c.label||'?').charAt(0)}</div>`;
+    const count = PRODUCTS.filter(p => p.cat === c.id).length;
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${thumb}</td>
+      <td><b>${c.label||c.id}</b></td>
+      <td>${c.gender||'unisex'}</td>
+      <td style="max-width:280px">${c.desc||c.sub||'—'}</td>
+      <td><b>${count}</b></td>
+      <td>
+        <button class="action-btn edit" data-edit-cat="${c.id}">Edit</button>
+        <button class="action-btn delete" data-delete-cat="${c.id}">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
   tbody.querySelectorAll('[data-edit-cat]').forEach(b =>
     b.addEventListener('click', () => openCategoryForm(b.dataset.editCat)));
   tbody.querySelectorAll('[data-delete-cat]').forEach(b =>
