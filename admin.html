@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Dashboard — Coolism Admin</title>
 <meta name="robots" content="noindex" />
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230B1A30'/%3E%3Ctext x='50' y='68' font-family='Georgia' font-size='60' font-weight='700' fill='%23F9F8F6' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
-<link href="https://fonts.googleapis.com/css2?family=Italiana&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@400;600;700&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23141414'/%3E%3Ctext x='50' y='68' font-family='Georgia' font-size='60' font-weight='700' fill='%23FFFFFF' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
+<link href="https://fonts.googleapis.com/css2?family=Italiana&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Playfair+Display:wght@400;500;600;700;800&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body data-page="admin" data-admin="iloog.cc@gmail.com">
+<body data-page="admin" data-admin="your-email@gmail.com">
 
+<!-- NAV -->
 <header class="nav-wrap" id="navWrap">
   <div class="container nav">
     <a href="index.html" class="logo"><span class="dot"></span>COOLISM</a>
@@ -22,13 +23,16 @@
       <button class="btn-ghost" id="accountBtn">Login</button>
       <a href="profile.html" class="icon-btn profile-icon" id="profileIcon" hidden aria-label="My Profile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
         </svg>
       </a>
+      <button class="btn-ghost" id="logoutBtn" hidden>Logout</button>
     </div>
   </div>
 </header>
 
+<!-- DASHBOARD -->
 <section class="section" style="padding-top:50px">
   <div class="container">
     <div class="sec-head">
@@ -45,15 +49,17 @@
       </div>
     </div>
 
+    <!-- TABS -->
     <div class="admin-tabs">
       <button class="admin-tab active" data-tab="products">Products</button>
       <button class="admin-tab" data-tab="categories">Categories</button>
       <button class="admin-tab" data-tab="orders">Orders</button>
       <button class="admin-tab" data-tab="users">Users</button>
       <button class="admin-tab" data-tab="analytics">Analytics</button>
+      <button class="admin-tab" data-tab="banner">Banner</button>
     </div>
 
-    <!-- PRODUCTS -->
+    <!-- ═══════ PRODUCTS ═══════ -->
     <div class="admin-panel" id="panel-products">
       <div class="table-toolbar">
         <input type="text" id="productSearch" placeholder="Search products by name, SKU, category..." />
@@ -75,7 +81,7 @@
       </div>
     </div>
 
-    <!-- CATEGORIES -->
+    <!-- ═══════ CATEGORIES ═══════ -->
     <div class="admin-panel" id="panel-categories" hidden>
       <div class="table-toolbar">
         <input type="text" id="categorySearch" placeholder="Search categories..." />
@@ -86,7 +92,8 @@
         <table class="users-table">
           <thead>
             <tr>
-              <th>#</th><th>Image</th><th>Name</th><th>Gender</th><th>Description</th><th>Products</th><th>Actions</th>
+              <th>#</th><th>Image</th><th>Name</th><th>Gender</th>
+              <th>Description</th><th>Products</th><th>Actions</th>
             </tr>
           </thead>
           <tbody id="categoriesTbody">
@@ -96,7 +103,7 @@
       </div>
     </div>
 
-    <!-- ORDERS -->
+    <!-- ═══════ ORDERS ═══════ -->
     <div class="admin-panel" id="panel-orders" hidden>
       <div class="table-toolbar">
         <input type="text" id="orderSearch" placeholder="Search by order ID, name, phone, city..." />
@@ -118,7 +125,7 @@
       </div>
     </div>
 
-    <!-- USERS -->
+    <!-- ═══════ USERS ═══════ -->
     <div class="admin-panel" id="panel-users" hidden>
       <div class="table-toolbar">
         <input type="text" id="userSearch" placeholder="Search by email, name or phone..." />
@@ -140,9 +147,69 @@
       </div>
     </div>
 
-    <!-- ANALYTICS -->
+    <!-- ═══════ ANALYTICS ═══════ -->
     <div class="admin-panel" id="panel-analytics" hidden>
       <div class="analytics-grid" id="analyticsGrid"></div>
+    </div>
+
+    <!-- ═══════ BANNER ═══════ -->
+    <div class="admin-panel" id="panel-banner" hidden>
+      <form id="bannerForm" class="product-modal" style="padding:32px;max-width:800px;border-radius:22px;max-height:none;position:relative">
+        <h3 style="margin-bottom:20px;font-family:'Playfair Display',serif">Hero Banner Settings</h3>
+        <p class="panel-sub" style="margin-bottom:24px">Control the top banner that appears on your homepage.</p>
+
+        <div class="form-section">
+          <p class="form-section-title">Background Image</p>
+          <div class="row-2">
+            <div>
+              <div class="cat-img-preview" id="bannerPreview" style="aspect-ratio:16/9"></div>
+            </div>
+            <div>
+              <div class="field">
+                <label>Image URL / Filename</label>
+                <input id="b-image" type="text" placeholder="images/banner.jpg or https://..." />
+              </div>
+              <p class="image-hint">Upload <code>banner.jpg</code> to your <code>images/</code> folder or paste a full URL.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <p class="form-section-title">Text Content</p>
+          <div class="field">
+            <label>Eyebrow (small line above title)</label>
+            <input id="b-eyebrow" type="text" placeholder="The Coolism Drop" />
+          </div>
+          <div class="field">
+            <label>Title (HTML allowed — use &lt;em&gt; for italic)</label>
+            <input id="b-title" type="text" placeholder="Comfort meets <em>Coolism</em>" />
+          </div>
+          <div class="field">
+            <label>Subtitle</label>
+            <input id="b-sub" type="text" placeholder="Premium pieces crafted..." />
+          </div>
+        </div>
+
+        <div class="form-section">
+          <p class="form-section-title">Buttons</p>
+          <div class="row-2">
+            <div class="field"><label>Button 1 — Text</label><input id="b-c1t" type="text" placeholder="Shop Man" /></div>
+            <div class="field"><label>Button 1 — Link</label><input id="b-c1l" type="text" placeholder="shop.html?gender=men" /></div>
+          </div>
+          <div class="row-2">
+            <div class="field"><label>Button 2 — Text</label><input id="b-c2t" type="text" placeholder="Shop Women" /></div>
+            <div class="field"><label>Button 2 — Link</label><input id="b-c2l" type="text" placeholder="shop.html?gender=women" /></div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <label class="stock-toggle"><input type="checkbox" id="b-active" checked /><span>Show banner on homepage</span></label>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:26px">
+          <button type="submit" class="btn btn-silver">Save Banner</button>
+        </div>
+      </form>
     </div>
 
     <div id="accessMsg" class="access-msg" hidden>
@@ -151,13 +218,13 @@
   </div>
 </section>
 
-<!-- PRODUCT MODAL -->
+<!-- ═══════ PRODUCT MODAL ═══════ -->
 <div class="modal-backdrop" id="productModal">
   <div class="product-modal">
     <div class="modal-panel">
       <button class="modal-close" id="productModalClose"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       <h2 class="panel-title" id="productModalTitle">Add New Product</h2>
-      <p class="panel-sub" id="productModalSub">Fill in the details below</p>
+      <p class="panel-sub" id="productModalSub">Fill in the details below to add a product</p>
 
       <form id="productForm" novalidate>
         <div class="form-section">
@@ -255,7 +322,7 @@
   </div>
 </div>
 
-<!-- CATEGORY MODAL -->
+<!-- ═══════ CATEGORY MODAL ═══════ -->
 <div class="modal-backdrop" id="categoryModal">
   <div class="product-modal">
     <div class="modal-panel">
@@ -316,7 +383,7 @@
   </div>
 </div>
 
-<!-- ORDER DETAIL MODAL -->
+<!-- ═══════ ORDER DETAIL MODAL ═══════ -->
 <div class="modal-backdrop" id="adminOrderModal">
   <div class="checkout-modal">
     <div class="modal-panel" style="grid-column:1/-1">
@@ -324,7 +391,7 @@
       <h2 class="panel-title" id="aoTitle">Order Details</h2>
       <p class="panel-sub" id="aoSub">—</p>
       <div id="aoBody"></div>
-      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--line)">
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--line-ink)">
         <p class="form-section-title">Update Order Status</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           <button class="action-btn" data-status="pending">Pending</button>
@@ -338,7 +405,7 @@
   </div>
 </div>
 
-<!-- USER MODAL -->
+<!-- ═══════ USER DETAIL MODAL ═══════ -->
 <div class="modal-backdrop" id="adminUserModal">
   <div class="checkout-modal">
     <div class="modal-panel" style="grid-column:1/-1">
