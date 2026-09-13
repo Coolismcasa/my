@@ -262,6 +262,7 @@ async function loadCatalog() {
       const loaded = {};
       snap.forEach(doc => {
         const d = doc.data();
+        if (d.hidden) return; // skip hidden categories
         loaded[doc.id] = {
           label: d.label || doc.id,
           gender: d.gender || 'unisex',
@@ -270,11 +271,16 @@ async function loadCatalog() {
         };
       });
       CATEGORIES = { ...FALLBACK_CATS, ...loaded };
+
+      // Also remove hidden fallbacks
+      const hiddenSnap = await db.collection('categories').where('hidden','==',true).get();
+      hiddenSnap.forEach(doc => { delete CATEGORIES[doc.id]; });
     } else {
       CATEGORIES = { ...FALLBACK_CATS };
     }
   } catch (e) { CATEGORIES = { ...FALLBACK_CATS }; }
-
+  // ... rest of product loading unchanged
+}
   try {
     const snap = await db.collection('products').get();
     if (!snap.empty) {
